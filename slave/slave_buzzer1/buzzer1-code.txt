@@ -1,0 +1,66 @@
+#include <SPI.h>
+#include <RF24.h>
+#include <nRF24L01.h>
+
+#define CE_PIN D0
+#define CSN_PIN D1
+#define SCK_PIN D5
+#define MOSI_PIN D7
+#define MISO_PIN D6
+#define button D2
+#define led D3
+
+SPISettings spiSettings = SPISettings(10000000, MSBFIRST, SPI_MODE0);
+RF24 radio(CE_PIN, CSN_PIN);
+const byte address[][6] ={"1Node", "2Node","3Node","4Node", "5Node"};
+unsigned long data[2];
+bool ledState = false;
+
+void setup()
+ {
+  pinMode(led, OUTPUT);
+  pinMode(button, INPUT_PULLUP);
+  Serial.begin(9600);
+  SPI.begin();
+  pinMode(SCK_PIN, OUTPUT);
+  pinMode(MOSI_PIN, OUTPUT);
+  pinMode(MISO_PIN, INPUT);
+  SPI.beginTransaction(spiSettings);
+  radio.begin();
+  radio.openReadingPipe(0, address[0]);
+  radio.setPALevel(RF24_PA_MIN);
+  radio.setDataRate(RF24_250KBPS);
+  radio.setAutoAck(false);
+  radio.setChannel(76);
+  radio.startListening();
+}
+void loop()
+{ 
+   if (radio.available())
+      {
+        byte message;
+        radio.read(&message, sizeof(message));
+        if (message == 1)
+        {
+          ledState = true;
+        }
+        else if (message == 0)
+        {
+          ledState = false;
+        }
+        digitalWrite(led, ledState);
+      }
+    int buttonState = digitalRead(button);
+    if (buttonState == LOW)
+      {
+       data[0] = millis();
+       data[1] = 1;
+       radio.stopListening();       
+       radio.openWritingPipe(address[1]);
+       radio.write(&data, sizeof(data));
+       Serial.println(data[1]);
+       Serial.println(data[0]);
+       radio.startListening();
+       delay(100);
+      }
+}
